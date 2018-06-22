@@ -1,0 +1,13 @@
+to_resolve: heise.de
+to_sleep: 13
+host_to_ping:
+  - 8.8.8.8
+  - heise.de
+ping_times: 6
+
+default_gateway: 192.168.1.1
+route_to_ensure:
+  - 172.16.0.0/12
+
+nameserver_qr: '^nameserver[ \t]*172\.'
+verbose: 1
