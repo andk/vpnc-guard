@@ -209,7 +209,7 @@ step "setup wlan" => ensure {
         $tr->_log->warn('does not match ESSID:"(?:TC-Intern)');
         return 0;
     }
-    $tr->_log->info("WLAN OK");
+    $tr->_log->debug("WLAN OK");
     return 1;
 } ## end ensure
 using {
@@ -241,7 +241,7 @@ my $only_wlan_default_route = step only_wlan_default_route => ensure {
         $tr->_log->warn("wlan routes counted should be 1, is $seen");
         return 0;
     }
-    $tr->_log->info("DEFAULT ROUTE COUNT 1 OK");
+    $tr->_log->debug("DEFAULT ROUTE COUNT 1 OK");
     return 1;
 } ## end ensure
 using {
@@ -286,7 +286,7 @@ my $ensure_route_tun = step ensure_route_tun => ensure {
         $tr->_log->error("no route for $route seen");
         return 0;
     }
-    $tr->_log->warn("ROUTE $route OK");
+    $tr->_log->debug("ROUTE $route OK");
     return 1;
 } ## end ensure
 using {
@@ -337,7 +337,7 @@ step setup_vpnc => ensure {
             $tr->_log->warn("pid for vpnc-connect process not found");
             return 0;
         }
-        $tr->_log->info("VPNC PROCESS $pid OK");
+        $tr->_log->debug("VPNC PROCESS $pid OK");
     }
     {
         my $nameserver_qr = $tr->nameserver_qr;
@@ -355,7 +355,7 @@ step setup_vpnc => ensure {
             $tr->_log->warn("no $nameserver_qr in $resolv_conf");
             return 0;
         }
-        $tr->_log->warn("seen $nameserver_qr in $resolv_conf");
+        $tr->_log->debug("seen $nameserver_qr in $resolv_conf");
     }
 
     $only_wlan_default_route->do;
@@ -395,7 +395,7 @@ step setup_vpnc => ensure {
                 return 0;
             } ## end else [ if (close $fh) ]
         } ## end TRY: for my $i (1 .. $trypingnameserver)
-        $tr->_log->info("PING NAMESERVER OK");
+        $tr->_log->debug("PING NAMESERVER OK");
     }
     {
         my $to_resolve = $tr->to_resolve;
@@ -410,7 +410,7 @@ step setup_vpnc => ensure {
             $tr->_log->warn("cannot resolve $to_resolve");
             return 0;
         }
-        $tr->_log->info("resolved $to_resolve");
+        $tr->_log->debug("resolved $to_resolve");
     }
     {
         my $trypingsomeserver = $tr->ping_times;  # 12 took really annoying long
@@ -425,26 +425,19 @@ step setup_vpnc => ensure {
                     last TRY;
                 }
                 elsif ($i < $trypingsomeserver) {
-                    $tr->_log->warn("cannot ping someserver '$s', will retry");
+                    $tr->_log->warn("cannot ping '$s', will retry");
                     sleep 4;
                     next TRY;
                 }
                 else {
-                    my $ignore = 1;
-                    if ($ignore) {
-                        $tr->_log->error(
+                    $tr->_log->error(
                             "cannot ping '$s', but will ignore for now");
-                        return 1;
-                    }
-                    else {
-                        $tr->_log->info("cannot ping '$s'");
-                        return 0;
-                    }
+                    return 1;
                 } ## end else [ if (close $fh) ]
-                $tr->_log->info("PING $s OK");
+                $tr->_log->debug("PING $s OK");
             } ## end TRY: for my $i (1 .. $trypingsomeserver)
         } ## end for my $s ($resolved, $tr...)
-        $tr->_log->info("PING someservers OK");
+        $tr->_log->debug("PING someservers OK");
     }
     return 1;
 } ## end ensure
