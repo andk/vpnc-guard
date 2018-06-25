@@ -98,6 +98,19 @@ HERE
 a nameserver value of /etc/resolv.conf to be matched
 HERE
 
+    subtype "WlanHashRef", as "Str", where {
+        ref($_) eq "HASH" && $_->{essid} && $_->{interface};
+    }, message {
+        "provided parameter doesn't match WlanHashRef defination";
+    };
+
+    has "wlan",
+        is            => "ro",
+        isa           => "HashRef",
+        required      => 1,
+        documentation => <<'HERE';
+HERE
+
     has "host_to_ping",
         is            => "ro",
         isa           => "ArrayRef[Str]",
@@ -189,9 +202,6 @@ my $hms_matcher = $tr->networkinterrupt;
 if ($hms_matcher) {
     my $hms = DateTime->now(time_zone => 'Europe/Berlin')->hms;
     my $qr = qr/$hms_matcher/;
-    if ($tr->verbose) {
-        $tr->_log->info("hms=$hms qr=$qr");
-    }
     if ($hms =~ $qr) {
         if ($tr->dry_run) {
             $tr->_log->info("DRYRUN: WOULD NOW INTERRUPT NETWORK");
@@ -205,7 +215,8 @@ if ($hms_matcher) {
 } ## end if ($hms_matcher)
 
 step "setup wlan" => ensure {
-    unless (fgrep qr/ESSID:"(?:TC-Intern)"/, "iwconfig wlan0 |") {
+    my $qx = sprintf 'ESSID:"(?:%s)"', $tr->wlan->{essid};
+    unless (fgrep qr/$qx/, join ' ', "iwconfig", $tr->wlan->{interface}, '|') {
         $tr->_log->warn('does not match ESSID:"(?:TC-Intern)');
         return 0;
     }
@@ -221,8 +232,8 @@ using {
 
     # ^^ noch nicht battle-tested, introduced 5.1.2018
 
-    # die "please make sure the wlan runs for TC-Intern";
-    # iwconfig wlan0 essid TC-Intern
+    # die "please make sure the wlan runs for essid";
+    # iwconfig wlan0 essid $tr->wlan->{essid}
     # vpnc-connect is called elsewhere, so it has probably not succeeded
 };
 
@@ -431,9 +442,9 @@ step setup_vpnc => ensure {
                 }
                 else {
                     $tr->_log->error(
-                            "cannot ping '$s', but will ignore for now");
+                        "cannot ping '$s', but will ignore for now");
                     return 1;
-                } ## end else [ if (close $fh) ]
+                }
                 $tr->_log->debug("PING $s OK");
             } ## end TRY: for my $i (1 .. $trypingsomeserver)
         } ## end for my $s ($resolved, $tr...)
