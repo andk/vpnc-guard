@@ -108,7 +108,7 @@ HERE
 a list of hosts to ping
 HERE
 
-=head2 _logger_config
+=head2 logger_config
 
     C<logger_config> is subtype of C<LoggerConfigStr>.
 

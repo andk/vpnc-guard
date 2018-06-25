@@ -10,4 +10,13 @@ route_to_ensure:
   - 172.16.0.0/12
 
 nameserver_qr: '^nameserver[ \t]*172\.'
+
 verbose: 1
+
+logger_config: |
+  log4perl.rootLogger              = INFO, Screen
+  log4perl.appender.Screen         = Log::Log4perl::Appender::Screen
+  log4perl.appender.Screen.stderr  = 0
+  log4perl.appender.Screen.layout=PatternLayout
+  log4perl.appender.Screen.layout.ConversionPattern=%d %5p [%5P]%L - %m%n
+
