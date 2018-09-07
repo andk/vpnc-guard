@@ -84,7 +84,7 @@ HERE
     has "route_to_ensure",
         is            => "ro",
         isa           => "ArrayRef[Str]",
-        required      => 1,
+        required      => 0,
         auto_deref    => 1,
         documentation => <<'HERE';
 a list of routes should be insured
@@ -107,7 +107,7 @@ HERE
     has "wlan",
         is            => "ro",
         isa           => "HashRef",
-        required      => 1,
+        required      => 0,
         documentation => <<'HERE';
 HERE
 
@@ -115,7 +115,7 @@ HERE
         is            => "ro",
         isa           => "ArrayRef[Str]",
         required      => 0,
-        default       => sub {qw/ 8.8.8.8 /},
+        default       => sub {[qw/ 8.8.8.8 /]},
         auto_deref    => 1,
         documentation => <<'HERE';
 a list of hosts to ping
@@ -214,70 +214,74 @@ if ($hms_matcher) {
     } ## end if ($hms =~ $qr)
 } ## end if ($hms_matcher)
 
-step "setup wlan" => ensure {
-    my $qx = sprintf 'ESSID:"(?:%s)"', $tr->wlan->{essid};
-    unless (fgrep qr/$qx/, join ' ', "iwconfig", $tr->wlan->{interface}, '|') {
-        $tr->_log->warn('does not match ESSID:"(?:TC-Intern)');
-        return 0;
-    }
-    $tr->_log->debug("WLAN OK");
-    return 1;
-} ## end ensure
-using {
-    # 0 == system iwconfig => 'wlan0', 'essid', 'TC-Intern' or die;
-    # ^^ reichte nicht am 5.1.2018
-
-    0 == system "/etc/init.d/network-manager", "restart"
-        or $tr->_log->logdie("Could not restart network manager");
-
-    # ^^ noch nicht battle-tested, introduced 5.1.2018
-
-    # die "please make sure the wlan runs for essid";
-    # iwconfig wlan0 essid $tr->wlan->{essid}
-    # vpnc-connect is called elsewhere, so it has probably not succeeded
-};
-
-my $only_wlan_default_route = step only_wlan_default_route => ensure {
-    open my $fh, "-|", ip => "route";
-    my $seen = 0;
-    while (<$fh>) {
-        my ($net) = /^(default)\s.*\bdev wlan0/ or next;
-        $seen++;
-    }
-    unless (close $fh) {
-        $tr->_log->warn("no dev wlan in ip r");
-        return 0;
-    }
-    unless ($seen == 1) {
-        $tr->_log->warn("wlan routes counted should be 1, is $seen");
-        return 0;
-    }
-    $tr->_log->debug("DEFAULT ROUTE COUNT 1 OK");
-    return 1;
-} ## end ensure
-using {
-    $tr->die_if_dryrun();
-
-    # die "did not see a uniq default route";
-    open my $fh, "-|", ip => "route";
-    my $has_wlan;
-    while (<$fh>) {
-        my ($full, $net) = /^(default.+dev\s+(\w+))/ or next;
-        if ($net =~ /^wlan0/) {
-            $has_wlan = 1;
-            next;
+my $only_wlan_default_route;
+if ($tr->wlan && keys %{$tr->wlan}) {
+    $DB::single = $DB::single = 1;
+    step "setup wlan" => ensure {
+        my $qx = sprintf 'ESSID:"(?:%s)"', $tr->wlan->{essid};
+        unless (fgrep qr/$qx/, join ' ', "iwconfig", $tr->wlan->{interface}, '|') {
+            $tr->_log->warn('does not match ESSID:"(?:TC-Intern)');
+            return 0;
         }
-        system "ip route del $full";
-    } ## end while (<$fh>)
-    unless (close $fh) {
-        $tr->_log->warn("ERROR");
-        return 0;
-    }
-    unless ($has_wlan) {
-        system join ' ', "ip route add default via", $tr->default_gateway;
-    }
-    return 1;
-};
+        $tr->_log->debug("WLAN OK");
+        return 1;
+    } ## end ensure
+    using {
+        # 0 == system iwconfig => 'wlan0', 'essid', 'TC-Intern' or die;
+        # ^^ reichte nicht am 5.1.2018
+
+        0 == system "/etc/init.d/network-manager", "restart"
+            or $tr->_log->logdie("Could not restart network manager");
+
+        # ^^ noch nicht battle-tested, introduced 5.1.2018
+
+        # die "please make sure the wlan runs for essid";
+        # iwconfig wlan0 essid $tr->wlan->{essid}
+        # vpnc-connect is called elsewhere, so it has probably not succeeded
+    };
+
+    $only_wlan_default_route = step only_wlan_default_route => ensure {
+        open my $fh, "-|", ip => "route";
+        my $seen = 0;
+        while (<$fh>) {
+            my ($net) = /^(default)\s.*\bdev wlan0/ or next;
+            $seen++;
+        }
+        unless (close $fh) {
+            $tr->_log->warn("no dev wlan in ip r");
+            return 0;
+        }
+        unless ($seen == 1) {
+            $tr->_log->warn("wlan routes counted should be 1, is $seen");
+            return 0;
+        }
+        $tr->_log->debug("DEFAULT ROUTE COUNT 1 OK");
+        return 1;
+    } ## end ensure
+    using {
+        $tr->die_if_dryrun();
+
+        # die "did not see a uniq default route";
+        open my $fh, "-|", ip => "route";
+        my $has_wlan;
+        while (<$fh>) {
+            my ($full, $net) = /^(default.+dev\s+(\w+))/ or next;
+            if ($net =~ /^wlan0/) {
+                $has_wlan = 1;
+                next;
+            }
+            system "ip route del $full";
+        } ## end while (<$fh>)
+        unless (close $fh) {
+            $tr->_log->warn("ERROR");
+            return 0;
+        }
+        unless ($has_wlan) {
+            system join ' ', "ip route add default via", $tr->default_gateway;
+        }
+        return 1;
+    };
+}
 
 my $ensure_route_tun = step ensure_route_tun => ensure {
     my ($route) = @_;
@@ -355,7 +359,7 @@ step setup_vpnc => ensure {
         my $resolv_conf   = q|/etc/resolv.conf|;
 
         open my $fh, "-|",
-            "grep '^nameserver' $resolv_conf | head -2 | grep '$nameserver_qr'";
+            "grep '^nameserver' $resolv_conf | head -2 | grep -E '$nameserver_qr'";
         while (<$fh>) {
             if (/^nameserver\s+([0-9\.]+)/) {
                 $nameserver = $1;
@@ -369,9 +373,10 @@ step setup_vpnc => ensure {
         $tr->_log->debug("seen $nameserver_qr in $resolv_conf");
     }
 
-    $only_wlan_default_route->do;
+    $only_wlan_default_route->do if $only_wlan_default_route;
 
-    $ensure_route_tun->do_foreach($tr->route_to_ensure);
+    $ensure_route_tun->do_foreach($tr->route_to_ensure)
+        if $tr->route_to_ensure && @{$tr->route_to_ensure};
     {
         my $trypingnameserver = $tr->ping_times;
     TRY: for my $i (1 .. $trypingnameserver) {
@@ -425,7 +430,7 @@ step setup_vpnc => ensure {
     }
     {
         my $trypingsomeserver = $tr->ping_times;  # 12 took really annoying long
-        for my $s ($resolved, $tr->host_to_ping) {
+        for my $s ($resolved, @{$tr->host_to_ping}) {
         TRY: for my $i (1 .. $trypingsomeserver) {
                 open my $fh, "-|", ping => '-c', 1, $s;
                 while (<$fh>) {
@@ -463,4 +468,4 @@ using {
     sleep $to_sleep;
 };
 
-$only_wlan_default_route->do;
+$only_wlan_default_route->do if $only_wlan_default_route;
