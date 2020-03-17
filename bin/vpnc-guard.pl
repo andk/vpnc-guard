@@ -62,7 +62,7 @@ HERE
         isa           => "Str",
         required      => 1,
         documentation => <<'HERE';
-host name shoud be resolveable
+host name should be resolveable
 HERE
 
     has "ping_times",
@@ -76,9 +76,9 @@ HERE
     has "default_gateway",
         is            => "ro",
         isa           => "Str",
-        required      => 1,
+        required      => 0,
         documentation => <<'HERE';
-the value of "ip route add default via .."
+the value of "ip route add default via .."; only gets used when wlan is true
 HERE
 
     has "route_to_ensure",
