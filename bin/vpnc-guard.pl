@@ -195,9 +195,6 @@ HERE
 
 my $tr = Testrunner->new_with_options();
 
-my $vpnc_config = qw|/etc/vpnc/default.conf|;
--r $vpnc_config || $tr->_log->logdie("can't read $vpnc_config");
-
 my $hms_matcher = $tr->networkinterrupt;
 if ($hms_matcher) {
     my $hms = DateTime->now(time_zone => 'Europe/Berlin')->hms;
